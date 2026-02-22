@@ -1,0 +1,149 @@
+name: Update Firmware & Deploy
+
+on:
+  schedule:
+    # Run daily at midnight UTC to pick up new USBArmyKnife releases
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'index.html'
+      - '.github/workflows/update-firmware.yml'
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Only one deployment at a time
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get install -y jq unzip wget
+
+      - name: Fetch latest USBArmyKnife release
+        id: release
+        run: |
+          RELEASE=$(curl -s https://api.github.com/repos/i-am-shodan/USBArmyKnife/releases/latest)
+          VERSION=$(echo "$RELEASE" | jq -r '.tag_name')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "$RELEASE" > /tmp/release.json
+          echo "Latest USBArmyKnife version: $VERSION"
+
+      - name: Download boot_app0.bin from Arduino-ESP32 framework
+        run: |
+          wget -q \
+            "https://raw.githubusercontent.com/espressif/arduino-esp32/master/tools/partitions/boot_app0.bin" \
+            -O /tmp/boot_app0.bin
+          echo "boot_app0.bin size: $(wc -c < /tmp/boot_app0.bin) bytes"
+
+      - name: Download and extract firmware binaries
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, subprocess, sys
+
+          DEVICES = {
+              "LILYGO-T-Dongle-S3":          {"chip": "ESP32-S3", "boot_offset": 0},
+              "Waveshare-ESP32-S3-LCD-1_47":  {"chip": "ESP32-S3", "boot_offset": 0},
+              "Waveshare-ESP32-S3-GEEK":      {"chip": "ESP32-S3", "boot_offset": 0},
+              "Generic-ESP32-S3":             {"chip": "ESP32-S3", "boot_offset": 0},
+              # ESP32-S2 bootloader sits at 0x1000 (4096), unlike ESP32-S3 where it is at 0x0000
+              "Generic-ESP32-S2":             {"chip": "ESP32-S2", "boot_offset": 4096},
+              "Evil-Crow-Cable-Wind":         {"chip": "ESP32-S3", "boot_offset": 0},
+              "LILYGO-T-Watch-S3":            {"chip": "ESP32-S3", "boot_offset": 0},
+              "M5-Atom-S3U":                  {"chip": "ESP32-S3", "boot_offset": 0},
+          }
+
+          version = os.environ.get("VERSION", "unknown")
+
+          with open("/tmp/release.json") as f:
+              release = json.load(f)
+
+          assets = {a["name"]: a["browser_download_url"] for a in release.get("assets", [])}
+
+          for device, info in DEVICES.items():
+              asset_name = f"{device}.Firmware.binaries.zip"
+              url = assets.get(asset_name)
+              if not url:
+                  print(f"WARNING: No asset found for {device}, skipping", flush=True)
+                  continue
+
+              print(f"Downloading {device}...", flush=True)
+              os.makedirs(f"firmware/{device}", exist_ok=True)
+
+              rc = subprocess.call(["wget", "-q", url, "-O", f"/tmp/{device}.zip"])
+              if rc != 0:
+                  print(f"ERROR: Failed to download {device}", flush=True)
+                  continue
+
+              rc = subprocess.call(["unzip", "-j", "-o", f"/tmp/{device}.zip", "*.bin", "-d", f"firmware/{device}/"])
+              if rc not in (0, 1):  # 0=success, 1=warnings (e.g. already exists); treat as OK
+                  print(f"ERROR: Failed to extract {device}", flush=True)
+                  continue
+
+              # Remove .elf files if somehow extracted
+              for f_name in os.listdir(f"firmware/{device}"):
+                  if f_name.endswith(".elf"):
+                      os.remove(f"firmware/{device}/{f_name}")
+
+              # Copy boot_app0.bin
+              subprocess.call(["cp", "/tmp/boot_app0.bin", f"firmware/{device}/boot_app0.bin"])
+
+              # Create manifest.json
+              manifest = {
+                  "name": "USBArmyKnife",
+                  "version": version,
+                  "builds": [
+                      {
+                          "chipFamily": info["chip"],
+                          "parts": [
+                              {"path": "bootloader.bin", "offset": info["boot_offset"]},
+                              {"path": "partitions.bin", "offset": 32768},
+                              {"path": "boot_app0.bin", "offset": 57344},
+                              {"path": "firmware.bin", "offset": 65536},
+                          ],
+                      }
+                  ],
+              }
+              with open(f"firmware/{device}/manifest.json", "w") as mf:
+                  json.dump(manifest, mf, indent=2)
+
+              print(f"Done: {device}", flush=True)
+
+          print("Firmware directories:")
+          for d in sorted(os.listdir("firmware")):
+              print(f"  firmware/{d}/")
+          PYEOF
+
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

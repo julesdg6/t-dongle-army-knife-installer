@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>USBArmyKnife Web Installer</title>
+  <script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+  <style>
+    :root {
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --bg: #0f172a;
+      --surface: #1e293b;
+      --surface2: #273549;
+      --border: #334155;
+      --text: #f1f5f9;
+      --text-muted: #94a3b8;
+      --success: #22c55e;
+      --warning: #f59e0b;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    header h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    header p {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .badge {
+      background: var(--accent);
+      color: white;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    main {
+      max-width: 800px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    section h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    .device-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 0.75rem;
+    }
+
+    .device-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      background: var(--surface2);
+      border: 2px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 0.9rem;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    .device-card:hover {
+      border-color: var(--accent);
+    }
+
+    .device-card input[type="radio"] {
+      margin-top: 0.2rem;
+      accent-color: var(--accent);
+      flex-shrink: 0;
+    }
+
+    .device-card.selected {
+      border-color: var(--accent);
+      background: rgba(37, 99, 235, 0.1);
+    }
+
+    .device-card strong {
+      display: block;
+      font-size: 0.9rem;
+      margin-bottom: 0.25rem;
+    }
+
+    .device-card p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin: 0;
+    }
+
+    .chip-tag {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--success);
+      background: rgba(34, 197, 94, 0.1);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+      border-radius: 999px;
+      padding: 0.1rem 0.45rem;
+      margin-top: 0.3rem;
+    }
+
+    .install-area {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+      padding: 1rem 0;
+    }
+
+    .selected-device-name {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .selected-device-name strong {
+      color: var(--text);
+    }
+
+    esp-web-install-button {
+      --esp-tools-button-color: var(--accent);
+      --esp-tools-button-hover-color: var(--accent-hover);
+    }
+
+    esp-web-install-button::part(button) {
+      background: var(--accent);
+      border: none;
+      border-radius: 0.5rem;
+      color: white;
+      cursor: pointer;
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 0.75rem 2rem;
+      transition: background 0.15s;
+    }
+
+    esp-web-install-button::part(button):hover {
+      background: var(--accent-hover);
+    }
+
+    .requirements {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .requirements li {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.6rem;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .requirements li .icon {
+      flex-shrink: 0;
+      font-size: 1rem;
+    }
+
+    .unsupported-browser {
+      background: rgba(245, 158, 11, 0.1);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      color: var(--warning);
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .version-info {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-align: center;
+    }
+
+    .version-info a {
+      color: var(--text-muted);
+    }
+
+    footer {
+      text-align: center;
+      padding: 2rem 1rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+
+    footer a { color: var(--text-muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>🔪 USBArmyKnife Installer</h1>
+      <p>
+        Web-based firmware installer &mdash;
+        powered by <a href="https://esphome.github.io/esp-web-tools/" target="_blank" rel="noopener">ESP Web Tools</a>
+      </p>
+    </div>
+  </header>
+
+  <main>
+    <section>
+      <h2>1. Select Your Device</h2>
+      <div class="device-grid" id="device-grid">
+        <label class="device-card selected" data-id="LILYGO-T-Dongle-S3">
+          <input type="radio" name="device" value="LILYGO-T-Dongle-S3" checked>
+          <div>
+            <strong>LILYGO T-Dongle S3</strong>
+            <p>USB dongle with ESP32-S3, TFT display &amp; SD card</p>
+            <span class="chip-tag">ESP32-S3</span>
+          </div>
+        </label>
+        <label class="device-card" data-id="Waveshare-ESP32-S3-LCD-1_47">
+          <input type="radio" name="device" value="Waveshare-ESP32-S3-LCD-1_47">
+          <div>
+            <strong>Waveshare ESP32-S3 LCD 1.47&quot;</strong>
+            <p>Waveshare development board with 1.47&quot; LCD</p>
+            <span class="chip-tag">ESP32-S3</span>
+          </div>
+        </label>
+        <label class="device-card" data-id="Waveshare-ESP32-S3-GEEK">
+          <input type="radio" name="device" value="Waveshare-ESP32-S3-GEEK">
+          <div>
+            <strong>Waveshare ESP32-S3 GEEK</strong>
+            <p>Waveshare GEEK board with TFT display &amp; SD card</p>
+            <span class="chip-tag">ESP32-S3</span>
+          </div>
+        </label>
+        <label class="device-card" data-id="Generic-ESP32-S3">
+          <input type="radio" name="device" value="Generic-ESP32-S3">
+          <div>
+            <strong>Generic ESP32-S3</strong>
+            <p>Any generic ESP32-S3 development board</p>
+            <span class="chip-tag">ESP32-S3</span>
+          </div>
+        </label>
+        <label class="device-card" data-id="Generic-ESP32-S2">
+          <input type="radio" name="device" value="Generic-ESP32-S2">
+          <div>
+            <strong>Generic ESP32-S2</strong>
+            <p>Any generic ESP32-S2 development board</p>
+            <span class="chip-tag">ESP32-S2</span>
+          </div>
+        </label>
+        <label class="device-card" data-id="Evil-Crow-Cable-Wind">
+          <input type="radio" name="device" value="Evil-Crow-Cable-Wind">
+          <div>
+            <strong>Evil Crow Cable Wind</strong>
+            <p>USB cable with embedded ESP32-S3</p>
+            <span class="chip-tag">ESP32-S3</span>
+          </div>
+        </label>
+        <label class="device-card" data-id="LILYGO-T-Watch-S3">
+          <input type="radio" name="device" value="LILYGO-T-Watch-S3">
+          <div>
+            <strong>LILYGO T-Watch S3</strong>
+            <p>ESP32-S3 smartwatch</p>
+            <span class="chip-tag">ESP32-S3</span>
+          </div>
+        </label>
+        <label class="device-card" data-id="M5-Atom-S3U">
+          <input type="radio" name="device" value="M5-Atom-S3U">
+          <div>
+            <strong>M5Stack Atom S3U</strong>
+            <p>Compact ESP32-S3 module with USB</p>
+            <span class="chip-tag">ESP32-S3</span>
+          </div>
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>2. Connect &amp; Flash</h2>
+
+      <div class="unsupported-browser" id="unsupported-msg">
+        ⚠️ Your browser does not support the Web Serial API.
+        Please use <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong> (version 89+).
+      </div>
+
+      <div class="install-area">
+        <p class="selected-device-name">
+          Selected: <strong id="selected-name">LILYGO T-Dongle S3</strong>
+        </p>
+
+        <esp-web-install-button
+          id="install-btn"
+          manifest="firmware/LILYGO-T-Dongle-S3/manifest.json"
+        ></esp-web-install-button>
+
+        <p class="version-info">
+          Firmware version: <span id="fw-version">loading&hellip;</span>
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Requirements</h2>
+      <ul class="requirements">
+        <li>
+          <span class="icon">🌐</span>
+          <span>
+            <strong>Chrome or Edge browser</strong> &mdash;
+            The Web Serial API is required. Firefox and Safari are not supported.
+          </span>
+        </li>
+        <li>
+          <span class="icon">🔌</span>
+          <span>
+            <strong>USB cable</strong> &mdash;
+            Connect your device via USB before clicking Install.
+            Use a data cable, not a charge-only cable.
+          </span>
+        </li>
+        <li>
+          <span class="icon">💡</span>
+          <span>
+            <strong>Bootloader mode</strong> &mdash;
+            On most devices the installer will automatically reset into bootloader mode.
+            If it fails, hold the <strong>BOOT</strong> button while connecting.
+          </span>
+        </li>
+        <li>
+          <span class="icon">⚠️</span>
+          <span>
+            <strong>Data will be erased</strong> &mdash;
+            A full install will erase all existing data on the device.
+          </span>
+        </li>
+      </ul>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      <a href="https://github.com/i-am-shodan/USBArmyKnife" target="_blank" rel="noopener">USBArmyKnife</a>
+      &bull;
+      <a href="https://github.com/julesdg6/t-dongle-army-knife-installer" target="_blank" rel="noopener">Installer source</a>
+      &bull;
+      Powered by <a href="https://esphome.github.io/esp-web-tools/" target="_blank" rel="noopener">ESP Web Tools</a>
+    </p>
+  </footer>
+
+  <script>
+    const deviceNames = {
+      "LILYGO-T-Dongle-S3": "LILYGO T-Dongle S3",
+      "Waveshare-ESP32-S3-LCD-1_47": "Waveshare ESP32-S3 LCD 1.47\"",
+      "Waveshare-ESP32-S3-GEEK": "Waveshare ESP32-S3 GEEK",
+      "Generic-ESP32-S3": "Generic ESP32-S3",
+      "Generic-ESP32-S2": "Generic ESP32-S2",
+      "Evil-Crow-Cable-Wind": "Evil Crow Cable Wind",
+      "LILYGO-T-Watch-S3": "LILYGO T-Watch S3",
+      "M5-Atom-S3U": "M5Stack Atom S3U",
+    };
+
+    const installBtn = document.getElementById("install-btn");
+    const selectedName = document.getElementById("selected-name");
+    const fwVersion = document.getElementById("fw-version");
+
+    // Device selection
+    document.querySelectorAll("input[name='device']").forEach((radio) => {
+      radio.addEventListener("change", (e) => {
+        const deviceId = e.target.value;
+        installBtn.setAttribute("manifest", `firmware/${deviceId}/manifest.json`);
+        selectedName.textContent = deviceNames[deviceId] || deviceId;
+
+        document.querySelectorAll(".device-card").forEach((card) => {
+          card.classList.toggle("selected", card.dataset.id === deviceId);
+        });
+
+        loadVersion(deviceId);
+      });
+    });
+
+    // Make the whole card label clickable
+    document.querySelectorAll(".device-card").forEach((card) => {
+      card.addEventListener("click", () => {
+        const radio = card.querySelector("input[type='radio']");
+        if (radio) radio.click();
+      });
+    });
+
+    // Load firmware version from manifest
+    async function loadVersion(deviceId) {
+      fwVersion.textContent = "loading\u2026";
+      try {
+        const resp = await fetch(`firmware/${deviceId}/manifest.json`);
+        if (!resp.ok) throw new Error("not found");
+        const data = await resp.json();
+        const tag = data.version || "unknown";
+        fwVersion.innerHTML = `<a href="https://github.com/i-am-shodan/USBArmyKnife/releases/tag/${tag}" target="_blank" rel="noopener">${tag}</a>`;
+      } catch {
+        fwVersion.textContent = "unavailable (firmware not yet downloaded)";
+      }
+    }
+
+    // Check browser support
+    if (!("serial" in navigator)) {
+      document.getElementById("unsupported-msg").style.display = "block";
+    }
+
+    // Load initial version
+    loadVersion("LILYGO-T-Dongle-S3");
+  </script>
+</body>
+</html>
